@@ -1,7 +1,22 @@
 #include "lstm.h"
-#include <math.h>
 #include <assert.h>
 #include <stdlib.h>
+
+double exp(double x) {
+    double a = 1.0, e = 0;
+    int invert = x<0;
+    x = fabs1(x);
+    for (int n = 1; e != e + a ; ++n) {
+        e += a;
+        a = a * x / n;
+    }
+    return invert ? 1/e : e;
+}
+
+
+double tanh(double x) {
+    return (exp(x) - exp(-x)) / (exp(x) + exp(-x));
+}
 
 void sigmoid_vec(LSTMVec input, LSTMVec output) {
     assert(input.length == output.length && "Length Mismatch");
