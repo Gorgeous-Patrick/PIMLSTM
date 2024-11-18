@@ -16,12 +16,6 @@ int *tokenize_text(const char *text, int *length) {
 void get_contextual_embedding(LSTMCell *cell, const char *text, double *embedding) {
     int sequence_length;
     int *token_sequence = tokenize_text(text, &sequence_length);
-    printf("%d\n", sequence_length);
-    // Iterate over each token and pass it through the LSTM
-    for (int t = 0; t < sequence_length; t++) {
-        printf("%d\n", token_sequence[t]);
-    }
-
     // Initialize the hidden and cell state to zero for the first token
     double *h_t = mem_alloc(cell->hidden_dim * sizeof(double));
     double *c_t = mem_alloc(cell->hidden_dim * sizeof(double));
@@ -31,7 +25,7 @@ void get_contextual_embedding(LSTMCell *cell, const char *text, double *embeddin
     // Iterate over each token and pass it through the LSTM
     for (int t = 0; t < sequence_length; t++) {
         
-
+        lstm_forward(cell, token_sequence[t], h_prev, c_prev, h_t, c_t);
         // Update previous states for the next timestep
         for (int i = 0; i < cell->hidden_dim; i++) {
             h_prev[i] = h_t[i];
@@ -41,20 +35,25 @@ void get_contextual_embedding(LSTMCell *cell, const char *text, double *embeddin
         // free(x_t);  // Free token embedding memory if dynamically allocated
     }
 
-    // Copy final hidden state as the contextual embedding
+    // // Copy final hidden state as the contextual embedding
     for (int i = 0; i < cell->hidden_dim; i++) {
         embedding[i] = h_t[i];
     }
 
-    // Clean up
-    // free(h_t);
-    // free(c_t);
+    // // Clean up
+    // // free(h_t);
+    // // free(c_t);
 }
 
 
 int main() {
     LSTMCell cell = create_lstm_cell(100, 128); // Create an LSTM cell with input dim 100 and hidden dim 128
-    double embedding[128]; // Allocate memory for the contextual embedding
+    printf("Input gate: %d\n", cell.input_gate.length);
+    for (int i = 0; i < cell.input_gate.length; i++) {
+        printf("%lf\n", cell.input_gate.array[i]);
+    }
+    // double embedding[128]; // Allocate memory for the contextual embedding
+    double *embedding = mem_alloc(128 * sizeof(double));
     char text[] = "This is a sample sentence."; // Input text
     get_contextual_embedding(&cell, text, embedding); // Get the contextual embedding for the input text
     // printf("Contextual embedding: [");
