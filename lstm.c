@@ -3,6 +3,22 @@
 #include <stdlib.h>
 #include <alloc.h>
 
+#define RAND_MAX 1024
+static unsigned long next = 1; // Seed value for the generator
+
+// Function to set the seed
+void srand(unsigned long seed) {
+    next = seed;
+}
+
+// Random number generator function
+int rand() {
+    // Constants for LCG (same as ANSI C)
+    next = next * 1103515245 + 12345;
+    return (unsigned int)(next / 65536) % 32768; // Return a pseudo-random integer
+}
+
+
 double exp(double x) {
     double a = 1.0, e = 0;
     int invert = x<0;
@@ -123,12 +139,12 @@ void lstm_forward(LSTMCell *cell, LSTMMat Wf, LSTMMat Wi, LSTMMat Wo, LSTMMat Wc
     }
 
     // Free temporary vectors
-    free(f_t.array);
-    free(i_t.array);
-    free(o_t.array);
-    free(c_tilde.array);
-    free(h_mul_result.array);
-    free(x_mul_result.array);
+    // free(f_t.array);
+    // free(i_t.array);
+    // free(o_t.array);
+    // free(c_tilde.array);
+    // free(h_mul_result.array);
+    // free(x_mul_result.array);
 }
 
 // Create random LSTM cell with given dimensions
@@ -143,6 +159,12 @@ LSTMCell create_lstm_cell(size_t input_dim, size_t hidden_dim) {
     cell.forget_gate.array = mem_alloc(hidden_dim * sizeof(double));
     cell.output_gate.array = mem_alloc(hidden_dim * sizeof(double));
     cell.cell_state.array = mem_alloc(hidden_dim * sizeof(double));
+    for (size_t i = 0; i < hidden_dim; i++) {
+        cell.input_gate.array[i] = (double) rand() / RAND_MAX;
+        cell.forget_gate.array[i] = (double) rand() / RAND_MAX;
+        cell.output_gate.array[i] = (double) rand() / RAND_MAX;
+        cell.cell_state.array[i] = (double) rand() / RAND_MAX;
+    }
 
     return cell;
 }
