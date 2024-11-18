@@ -1,5 +1,5 @@
 dev: dev.c lstm.c lstm.h
-	dpu-upmem-dpurte-clang -O2 dev.c lstm.c -o dev
+	dpu-upmem-dpurte-clang -O2 dev.c lstm.c tensor.c -o dev
 host:
 	gcc --std=c99 host.c -o host `dpu-pkg-config --cflags --libs dpu`
 

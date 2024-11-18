@@ -1,178 +1,100 @@
 #include "lstm.h"
-#include <assert.h>
-#include <stdlib.h>
-#include <alloc.h>
 
-#define RAND_MAX 1024
-static unsigned long next = 1; // Seed value for the generator
-
-// Function to set the seed
-void srand(unsigned long seed) {
-    next = seed;
+static inline tensor ** create_tensor_array(int size){
+    tensor ** array = (tensor **)SAFE_MALLOC(sizeof(tensor *) * size);
+    return array;
 }
 
-// Random number generator function
-int rand() {
-    // Constants for LCG (same as ANSI C)
-    next = next * 1103515245 + 12345;
-    return (unsigned int)(next / 65536) % 32768; // Return a pseudo-random integer
+LSTM * lstm_init(int input_size, int hidden_size, int output_size, int sequence_length){
+    LSTM * lstm = (LSTM *)SAFE_MALLOC(sizeof(LSTM));
+
+    int weight_shape[2] = {hidden_size, input_size};
+    int output_shape[2] = {output_size, hidden_size};
+
+
+    lstm->hidden_size = hidden_size;
+    lstm->sequence_length = sequence_length;
+
+    lstm->Wf = tensor_rand(weight_shape);
+    lstm->Wi = tensor_rand(weight_shape);
+    lstm->Wc = tensor_rand(weight_shape);
+    lstm->Wo = tensor_rand(weight_shape);
+    lstm->Wy = tensor_rand(output_shape);
+
+
+    int init_shape[2] = {hidden_size, 1};
+    lstm->hidden_states = create_tensor_array(lstm->sequence_length + 1);
+    lstm->hidden_states[0] = tensor_zeros(init_shape);
+
+    lstm->cell_states = create_tensor_array(lstm->sequence_length + 1);
+    lstm->cell_states[0] = tensor_zeros(init_shape);
+
+    lstm->concat_inputs = create_tensor_array(lstm->sequence_length);
+    lstm->forget_gates = create_tensor_array(lstm->sequence_length);
+    lstm->input_gates = create_tensor_array(lstm->sequence_length);
+    lstm->candidate_gates = create_tensor_array(lstm->sequence_length);
+    lstm->output_gates = create_tensor_array(lstm->sequence_length);
+
+    lstm->outputs = create_tensor_array(lstm->sequence_length);
+
+    return lstm;
 }
 
+tensor ** lstm_forward(LSTM * self, tensor * input){
+    for(int i = 0; i < self->sequence_length; i++){
+        self->concat_inputs[i] = tensor_concat(self->hidden_states[i], tensor_index(input, i));
 
-double exp(double x) {
-    double a = 1.0, e = 0;
-    int invert = x<0;
-    if (invert) x = -x;
-    for (int n = 1; e != e + a ; ++n) {
-        e += a;
-        a = a * x / n;
+        self->forget_gates[i] = _sigmoid(_mat_mul(self->Wf, self->concat_inputs[i]));
+        self->input_gates[i] = _sigmoid(_mat_mul(self->Wi, self->concat_inputs[i]));
+        self->candidate_gates[i] = _tanh(_mat_mul(self->Wc, self->concat_inputs[i]));
+        self->output_gates[i] = _sigmoid(_mat_mul(self->Wo, self->concat_inputs[i]));
+
+        self->cell_states[i + 1] = _mul(self->forget_gates[i], self->cell_states[i]);
+        self->cell_states[i + 1] = _plus(self->cell_states[i + 1], _mul(self->input_gates[i], self->candidate_gates[i])); 
+
+        self->hidden_states[i + 1] = _mul(self->output_gates[i], _tanh(self->cell_states[i+1]));
+
+        self->outputs[i] = _mat_mul(self->Wy, self->hidden_states[i+1]);
     }
-    return invert ? 1/e : e;
+
+    return self->outputs;
 }
 
-
-double tanh(double x) {
-    return (exp(x) - exp(-x)) / (exp(x) + exp(-x));
-}
-
-void sigmoid_vec(LSTMVec input, LSTMVec output) {
-    assert(input.length == output.length && "Length Mismatch");
-    for (size_t i = 0; i < input.length; i++) {
-        output.array[i] = 1.0 / (1.0 + exp(-input.array[i]));
-    }
-}
-
-void tanh_vec(LSTMVec input, LSTMVec output) {
-    assert(input.length == output.length && "Length Mismatch");
-    for (size_t i = 0; i < input.length; i++) {
-        output.array[i] = tanh(input.array[i]);
-    }
-}
-
-void softmax_vec(LSTMVec input, LSTMVec output) {
-    assert(input.length == output.length && "Length Mismatch");
-    double sum = 0.0;
-    for (size_t i = 0; i < input.length; i++) {
-        output.array[i] = exp(input.array[i]);
-        sum += output.array[i];
-    }
-    for (size_t i = 0; i < input.length; i++) {
-        output.array[i] /= sum;
-    }
-}
-
-double dot_product_vec(LSTMVec input1, LSTMVec input2) {
-    assert(input1.length == input2.length && "Length Mismatch");
-    double sum = 0.0;
-    for (size_t i = 0; i < input1.length; i++) {
-        sum += input1.array[i] * input2.array[i];
-    }
-    return sum;
-}
-
-void mat_vec_mul(LSTMMat mat, LSTMVec vec, LSTMVec output) {
-    assert(mat.width == vec.length && "Width Mismatch");
-    assert(mat.height == output.length && "Height Mismatch");
-    for (size_t i = 0; i < mat.height; i++) {
-        output.array[i] = 0.0;
-        for (size_t j = 0; j < mat.width; j++) {
-            output.array[i] += mat.array[i * mat.width + j] * vec.array[j];
+void tensor_array_cleanup(tensor ** array, int size){
+    for(int i = 0; i < size; i++){
+        if(array[i]!=NULL){
+            tensor_cleanup(array[i]);
         }
     }
 }
 
-void add_vec(LSTMVec *vec1, LSTMVec *vec2, LSTMVec *output) {
-    for (size_t i = 0; i < vec1->length; i++) {
-        output->array[i] = vec1->array[i] + vec2->array[i];
+void lstm_cleanup(LSTM * this){
+    if(this == NULL){
+        return;
     }
+
+    tensor_cleanup(this->Wf);
+    tensor_cleanup(this->Wi);
+    tensor_cleanup(this->Wo);
+    tensor_cleanup(this->Wy);
+
+    tensor_array_cleanup(this->hidden_states, this->sequence_length);
+    tensor_array_cleanup(this->cell_states, this->sequence_length);
+    tensor_array_cleanup(this->concat_inputs, this->sequence_length);
+    tensor_array_cleanup(this->forget_gates, this->sequence_length);
+    tensor_array_cleanup(this->input_gates, this->sequence_length);
+    tensor_array_cleanup(this->candidate_gates, this->sequence_length);
+    tensor_array_cleanup(this->output_gates, this->sequence_length);
+    tensor_array_cleanup(this->outputs, this->sequence_length);
+
+
+
+
+    // free(this->hidden_states);
+    // free(this->cell_states);
+
+    // free(this);
+    SAFE_FREE(this->hidden_states);
+    SAFE_FREE(this->cell_states);
+    SAFE_FREE(this);
 }
-
-// Forward pass function for the LSTM cell
-void lstm_forward(LSTMCell *cell, LSTMMat Wf, LSTMMat Wi, LSTMMat Wo, LSTMMat Wc, LSTMVec h_prev, LSTMVec x_t, LSTMVec *h_t, LSTMVec *c_t) {
-    // Temporary vectors for intermediate calculations
-    LSTMVec f_t, i_t, o_t, c_tilde;
-    f_t.length = i_t.length = o_t.length = c_tilde.length = cell->input_gate.length;
-
-    // Allocate memory for each gate's result
-    f_t.array = mem_alloc(f_t.length * sizeof(double));
-    i_t.array = mem_alloc(i_t.length * sizeof(double));
-    o_t.array = mem_alloc(o_t.length * sizeof(double));
-    c_tilde.array = mem_alloc(c_tilde.length * sizeof(double));
-
-    // Temporary storage for intermediate matrix-vector multiplication results
-    LSTMVec h_mul_result = {h_prev.length, mem_alloc(h_prev.length * sizeof(double))};
-    LSTMVec x_mul_result = {x_t.length, mem_alloc(x_t.length * sizeof(double))};
-
-    // Forget gate f_t = sigmoid(Wf * h_prev + Wf * x_t)
-    mat_vec_mul(Wf, h_prev, f_t);           // f_t = Wf * h_prev
-    mat_vec_mul(Wf, x_t, x_mul_result);     // x_mul_result = Wf * x_t
-    add_vec(&f_t, &x_mul_result, &f_t);     // f_t += x_mul_result
-    sigmoid_vec(f_t, cell->forget_gate);
-
-    // Input gate i_t = sigmoid(Wi * h_prev + Wi * x_t)
-    mat_vec_mul(Wi, h_prev, i_t);           // i_t = Wi * h_prev
-    mat_vec_mul(Wi, x_t, x_mul_result);     // x_mul_result = Wi * x_t
-    add_vec(&i_t, &x_mul_result, &i_t);     // i_t += x_mul_result
-    sigmoid_vec(i_t, cell->input_gate);
-
-    // Candidate cell state c~_t = tanh(Wc * h_prev + Wc * x_t)
-    mat_vec_mul(Wc, h_prev, c_tilde);       // c_tilde = Wc * h_prev
-    mat_vec_mul(Wc, x_t, x_mul_result);     // x_mul_result = Wc * x_t
-    add_vec(&c_tilde, &x_mul_result, &c_tilde); // c_tilde += x_mul_result
-    tanh_vec(c_tilde, cell->cell_state);
-
-    // Update cell state c_t = f_t * c_prev + i_t * c~_t
-    for (size_t i = 0; i < c_t->length; i++) {
-        c_t->array[i] = f_t.array[i] * c_t->array[i] + i_t.array[i] * c_tilde.array[i];
-    }
-
-    // Output gate o_t = sigmoid(Wo * h_prev + Wo * x_t)
-    mat_vec_mul(Wo, h_prev, o_t);           // o_t = Wo * h_prev
-    mat_vec_mul(Wo, x_t, x_mul_result);     // x_mul_result = Wo * x_t
-    add_vec(&o_t, &x_mul_result, &o_t);     // o_t += x_mul_result
-    sigmoid_vec(o_t, cell->output_gate);
-
-    // Compute the new hidden state h_t = o_t * tanh(c_t)
-    tanh_vec(*c_t, *h_t);                   // Apply tanh to cell state
-    for (size_t i = 0; i < h_t->length; i++) {
-        h_t->array[i] *= o_t.array[i];
-    }
-
-    // Free temporary vectors
-    // free(f_t.array);
-    // free(i_t.array);
-    // free(o_t.array);
-    // free(c_tilde.array);
-    // free(h_mul_result.array);
-    // free(x_mul_result.array);
-}
-
-// Create random LSTM cell with given dimensions
-LSTMCell create_lstm_cell(size_t input_dim, size_t hidden_dim) {
-    LSTMCell cell;
-    cell.hidden_dim = hidden_dim;
-    cell.input_gate.length = hidden_dim;
-    cell.forget_gate.length = hidden_dim;
-    cell.output_gate.length = hidden_dim;
-    cell.cell_state.length = hidden_dim;
-    cell.input_gate.array = mem_alloc(hidden_dim * sizeof(double));
-    cell.forget_gate.array = mem_alloc(hidden_dim * sizeof(double));
-    cell.output_gate.array = mem_alloc(hidden_dim * sizeof(double));
-    cell.cell_state.array = mem_alloc(hidden_dim * sizeof(double));
-    for (size_t i = 0; i < hidden_dim; i++) {
-        cell.input_gate.array[i] = (double) rand() / RAND_MAX;
-        cell.forget_gate.array[i] = (double) rand() / RAND_MAX;
-        cell.output_gate.array[i] = (double) rand() / RAND_MAX;
-        cell.cell_state.array[i] = (double) rand() / RAND_MAX;
-    }
-
-    return cell;
-}
-
-// // Free memory allocated for LSTM cell
-// void free_lstm_cell(LSTMCell *cell) {
-//     free(cell->input_gate.array);
-//     free(cell->forget_gate.array);
-//     free(cell->output_gate.array);
-//     free(cell->cell_state.array);
-// }

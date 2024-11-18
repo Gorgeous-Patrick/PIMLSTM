@@ -1,28 +1,50 @@
 #ifndef LSTM_H
 #define LSTM_H
-#include <stddef.h>
-typedef struct _LSTMMat {
-    size_t width, height;
-    double * array;
-} LSTMMat;
 
-typedef struct _LSTMVec {
-    size_t length;
-    double * array; 
-} LSTMVec;
+#include "tensor.h"
 
-typedef struct _LSTMCell {
-    int hidden_dim, input_dim;
-    LSTMVec input_gate, forget_gate, output_gate, cell_state;
-} LSTMCell;
+#define _sigmoid tensor_sigmoid
+#define _tanh tensor_tanh
+#define _plus tensor_plus
+#define _mul tensor_mul
+#define _mat_mul tensor_mat_mul
 
-void sigmoid_vec(LSTMVec input, LSTMVec output);
-void tanh_vec(LSTMVec input, LSTMVec output);
-void softmax_vec(LSTMVec input, LSTMVec output);
-double dot_product_vec(LSTMVec input1, LSTMVec input2);
-void mat_vec_mul(LSTMMat mat, LSTMVec vec, LSTMVec output);
-void add_vec(LSTMVec *vec1, LSTMVec *vec2, LSTMVec *output);
-LSTMCell create_lstm_cell(size_t input_dim, size_t hidden_dim);
-void free_lstm_cell(LSTMCell *cell);
 
-#endif
+
+typedef struct lstm{
+    //hyperparameters
+    int hidden_size;
+    int sequence_length;
+
+    //forget gate
+    tensor * Wf;
+
+    //input gate
+    tensor * Wi;
+
+    //output gate
+    tensor * Wo;
+
+    //cell state
+    tensor * Wc;
+
+    //output
+    tensor * Wy;
+
+    // These should be array lists instead of regular arrays
+    tensor ** hidden_states;
+    tensor ** cell_states;
+    tensor ** concat_inputs;
+    tensor ** forget_gates;
+    tensor ** input_gates;
+    tensor ** candidate_gates;
+    tensor ** output_gates;
+
+    tensor ** outputs;
+} LSTM;
+
+LSTM * lstm_init(int input_size, int hidden_size, int output_size, int sequence_length);
+tensor ** lstm_forward(LSTM * lstm, tensor * input);
+void lstm_cleanup(LSTM * this);
+
+#endif // LSTM_H

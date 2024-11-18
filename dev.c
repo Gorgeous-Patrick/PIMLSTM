@@ -1,67 +1,29 @@
 #include <stdio.h>
+
+#include "tensor.h"
 #include "lstm.h"
 
-// Example tokenization and integer encoding for demonstration purposes.
-int *tokenize_text(const char *text, int *length) {
-    // Tokenize text and convert tokens to integers
-    // You would replace this with actual tokenization and word embedding lookup
-    *length = strlen(text);
-    int * tokens = (int *) mem_alloc(*length * sizeof(int));
-    for (int i = 0; i < length; i++) {
-        tokens[i] = i;
-    }
-    return tokens;
-}
 
-void get_contextual_embedding(LSTMCell *cell, const char *text, double *embedding) {
-    int sequence_length;
-    int *token_sequence = tokenize_text(text, &sequence_length);
-    // Initialize the hidden and cell state to zero for the first token
-    double *h_t = mem_alloc(cell->hidden_dim * sizeof(double));
-    double *c_t = mem_alloc(cell->hidden_dim * sizeof(double));
-    double *h_prev = h_t;
-    double *c_prev = c_t;
+int main(){
+    int sequence_length = 15;
+    int input_length = 32;
+    int hidden_size = 25;
 
-    // Iterate over each token and pass it through the LSTM
-    for (int t = 0; t < sequence_length; t++) {
-        
-        lstm_forward(cell, token_sequence[t], h_prev, c_prev, h_t, c_t);
-        // Update previous states for the next timestep
-        for (int i = 0; i < cell->hidden_dim; i++) {
-            h_prev[i] = h_t[i];
-            c_prev[i] = c_t[i];
-        }
 
-        // free(x_t);  // Free token embedding memory if dynamically allocated
+    int output_size = sequence_length;
+    int input_size = hidden_size + sequence_length;
+
+    LSTM * lstm = lstm_init(input_size, hidden_size, output_size, sequence_length);
+
+    int input_shape[2] = {input_length, sequence_length};
+    tensor * input = tensor_rand(input_shape);
+
+
+    tensor ** outputs = lstm_forward(lstm, input);
+
+    for(int i = 0; i < sequence_length; i++){
+        tensor_printf(outputs[i]);
     }
 
-    // // Copy final hidden state as the contextual embedding
-    for (int i = 0; i < cell->hidden_dim; i++) {
-        embedding[i] = h_t[i];
-    }
-
-    // // Clean up
-    // // free(h_t);
-    // // free(c_t);
-}
-
-
-int main() {
-    LSTMCell cell = create_lstm_cell(100, 128); // Create an LSTM cell with input dim 100 and hidden dim 128
-    printf("Input gate: %d\n", cell.input_gate.length);
-    for (int i = 0; i < cell.input_gate.length; i++) {
-        printf("%lf\n", cell.input_gate.array[i]);
-    }
-    // double embedding[128]; // Allocate memory for the contextual embedding
-    double *embedding = mem_alloc(128 * sizeof(double));
-    char text[] = "This is a sample sentence."; // Input text
-    get_contextual_embedding(&cell, text, embedding); // Get the contextual embedding for the input text
-    // printf("Contextual embedding: [");
-    // for (int i = 0; i < 128; i++) {
-    //     printf("%lf, ", embedding[i]);
-    // }
-    // printf("]\n");
-    mem_reset();
-    // printf("%lf", exp(1.0));
-    return 0;
+    lstm_cleanup(lstm);
 }
