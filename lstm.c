@@ -1,11 +1,12 @@
 #include "lstm.h"
 #include <assert.h>
 #include <stdlib.h>
+#include <alloc.h>
 
 double exp(double x) {
     double a = 1.0, e = 0;
     int invert = x<0;
-    x = fabs1(x);
+    if (invert) x = -x;
     for (int n = 1; e != e + a ; ++n) {
         e += a;
         a = a * x / n;
@@ -77,14 +78,14 @@ void lstm_forward(LSTMCell *cell, LSTMMat Wf, LSTMMat Wi, LSTMMat Wo, LSTMMat Wc
     f_t.length = i_t.length = o_t.length = c_tilde.length = cell->input_gate.length;
 
     // Allocate memory for each gate's result
-    f_t.array = malloc(f_t.length * sizeof(double));
-    i_t.array = malloc(i_t.length * sizeof(double));
-    o_t.array = malloc(o_t.length * sizeof(double));
-    c_tilde.array = malloc(c_tilde.length * sizeof(double));
+    f_t.array = mem_alloc(f_t.length * sizeof(double));
+    i_t.array = mem_alloc(i_t.length * sizeof(double));
+    o_t.array = mem_alloc(o_t.length * sizeof(double));
+    c_tilde.array = mem_alloc(c_tilde.length * sizeof(double));
 
     // Temporary storage for intermediate matrix-vector multiplication results
-    LSTMVec h_mul_result = {h_prev.length, malloc(h_prev.length * sizeof(double))};
-    LSTMVec x_mul_result = {x_t.length, malloc(x_t.length * sizeof(double))};
+    LSTMVec h_mul_result = {h_prev.length, mem_alloc(h_prev.length * sizeof(double))};
+    LSTMVec x_mul_result = {x_t.length, mem_alloc(x_t.length * sizeof(double))};
 
     // Forget gate f_t = sigmoid(Wf * h_prev + Wf * x_t)
     mat_vec_mul(Wf, h_prev, f_t);           // f_t = Wf * h_prev
@@ -129,3 +130,27 @@ void lstm_forward(LSTMCell *cell, LSTMMat Wf, LSTMMat Wi, LSTMMat Wo, LSTMMat Wc
     free(h_mul_result.array);
     free(x_mul_result.array);
 }
+
+// Create random LSTM cell with given dimensions
+LSTMCell create_lstm_cell(size_t input_dim, size_t hidden_dim) {
+    LSTMCell cell;
+    cell.hidden_dim = hidden_dim;
+    cell.input_gate.length = hidden_dim;
+    cell.forget_gate.length = hidden_dim;
+    cell.output_gate.length = hidden_dim;
+    cell.cell_state.length = hidden_dim;
+    cell.input_gate.array = mem_alloc(hidden_dim * sizeof(double));
+    cell.forget_gate.array = mem_alloc(hidden_dim * sizeof(double));
+    cell.output_gate.array = mem_alloc(hidden_dim * sizeof(double));
+    cell.cell_state.array = mem_alloc(hidden_dim * sizeof(double));
+
+    return cell;
+}
+
+// // Free memory allocated for LSTM cell
+// void free_lstm_cell(LSTMCell *cell) {
+//     free(cell->input_gate.array);
+//     free(cell->forget_gate.array);
+//     free(cell->output_gate.array);
+//     free(cell->cell_state.array);
+// }
