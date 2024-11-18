@@ -5,7 +5,7 @@
 
 
 int main(){
-    int sequence_length = 15;
+    int sequence_length = 7;
     int input_length = 32;
     int hidden_size = 25;
 
@@ -26,4 +26,5 @@ int main(){
     }
 
     lstm_cleanup(lstm);
+    mem_reset();
 }

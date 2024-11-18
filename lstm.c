@@ -41,6 +41,7 @@ LSTM * lstm_init(int input_size, int hidden_size, int output_size, int sequence_
 }
 
 tensor ** lstm_forward(LSTM * self, tensor * input){
+    printf("Sequence length: %d\n", self->sequence_length);
     for(int i = 0; i < self->sequence_length; i++){
         self->concat_inputs[i] = tensor_concat(self->hidden_states[i], tensor_index(input, i));
 

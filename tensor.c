@@ -213,7 +213,7 @@ void tensor_printf(tensor * self){
         printf("[");
         for(int j = 0; j < self->shape[1]; j++){
             int index = j + (i * self->shape[1]);
-            printf("%g", self->data[index]);
+            printf("%lf", self->data[index]);
 
             if(j < self->shape[1] - 1){
                 printf(",");
