@@ -1,101 +1,141 @@
-#include "lstm.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <alloc.h>
 
-static inline tensor ** create_tensor_array(int size){
-    tensor ** array = (tensor **)SAFE_MALLOC(sizeof(tensor *) * size);
-    return array;
+// Approximation of exp(x)
+float exp_approx(float x) {
+    float result = 1.0f + x + (x * x) / 2.0f + (x * x * x) / 6.0f;
+    return result > 100.0f ? 100.0f : result; // Prevent overflow
 }
 
-LSTM * lstm_init(int input_size, int hidden_size, int output_size, int sequence_length){
-    LSTM * lstm = (LSTM *)SAFE_MALLOC(sizeof(LSTM));
-
-    int weight_shape[2] = {hidden_size, input_size};
-    int output_shape[2] = {output_size, hidden_size};
-
-
-    lstm->hidden_size = hidden_size;
-    lstm->sequence_length = sequence_length;
-
-    lstm->Wf = tensor_rand(weight_shape);
-    lstm->Wi = tensor_rand(weight_shape);
-    lstm->Wc = tensor_rand(weight_shape);
-    lstm->Wo = tensor_rand(weight_shape);
-    lstm->Wy = tensor_rand(output_shape);
-
-
-    int init_shape[2] = {hidden_size, 1};
-    lstm->hidden_states = create_tensor_array(lstm->sequence_length + 1);
-    lstm->hidden_states[0] = tensor_zeros(init_shape);
-
-    lstm->cell_states = create_tensor_array(lstm->sequence_length + 1);
-    lstm->cell_states[0] = tensor_zeros(init_shape);
-
-    lstm->concat_inputs = create_tensor_array(lstm->sequence_length);
-    lstm->forget_gates = create_tensor_array(lstm->sequence_length);
-    lstm->input_gates = create_tensor_array(lstm->sequence_length);
-    lstm->candidate_gates = create_tensor_array(lstm->sequence_length);
-    lstm->output_gates = create_tensor_array(lstm->sequence_length);
-
-    lstm->outputs = create_tensor_array(lstm->sequence_length);
-
-    return lstm;
+// Approximation of sigmoid(x) = 1 / (1 + exp(-x))
+float sigmoid(float x) {
+    return 1.0f / (1.0f + exp_approx(-x));
 }
 
-tensor ** lstm_forward(LSTM * self, tensor * input){
-    printf("Sequence length: %d\n", self->sequence_length);
-    for(int i = 0; i < self->sequence_length; i++){
-        self->concat_inputs[i] = tensor_concat(self->hidden_states[i], tensor_index(input, i));
+// Approximation of tanh(x)
+float tanh_approx(float x) {
+    float x2 = x * x;
+    return x * (27.0f + x2) / (27.0f + 9.0f * x2);
+}
 
-        self->forget_gates[i] = _sigmoid(_mat_mul(self->Wf, self->concat_inputs[i]));
-        self->input_gates[i] = _sigmoid(_mat_mul(self->Wi, self->concat_inputs[i]));
-        self->candidate_gates[i] = _tanh(_mat_mul(self->Wc, self->concat_inputs[i]));
-        self->output_gates[i] = _sigmoid(_mat_mul(self->Wo, self->concat_inputs[i]));
-
-        self->cell_states[i + 1] = _mul(self->forget_gates[i], self->cell_states[i]);
-        self->cell_states[i + 1] = _plus(self->cell_states[i + 1], _mul(self->input_gates[i], self->candidate_gates[i])); 
-
-        self->hidden_states[i + 1] = _mul(self->output_gates[i], _tanh(self->cell_states[i+1]));
-
-        self->outputs[i] = _mat_mul(self->Wy, self->hidden_states[i+1]);
+// Manual array copy function
+void array_copy(float *dest, const float *src, int size) {
+    for (int i = 0; i < size; i++) {
+        dest[i] = src[i];
     }
-
-    return self->outputs;
 }
 
-void tensor_array_cleanup(tensor ** array, int size){
-    for(int i = 0; i < size; i++){
-        if(array[i]!=NULL){
-            tensor_cleanup(array[i]);
+// LSTM forward pass
+void lstm_forward(float *input, float *prev_hidden, float *prev_cell, 
+                  float *weights, float *biases, int input_size, int hidden_size,
+                  float *output_hidden, float *output_cell, float *workspace) {
+    // Workspace memory allocation
+    float *gates = workspace; // Store [input gate, forget gate, cell gate, output gate] concatenated
+    float *new_cell = gates + 4 * hidden_size;
+
+    // Compute gates: input, forget, cell, output
+    for (int i = 0; i < 4 * hidden_size; i++) {
+        gates[i] = biases[i];
+        for (int j = 0; j < input_size; j++) {
+            gates[i] += input[j] * weights[i * input_size + j];
+        }
+        for (int j = 0; j < hidden_size; j++) {
+            gates[i] += prev_hidden[j] * weights[4 * hidden_size * input_size + i * hidden_size + j];
         }
     }
-}
 
-void lstm_cleanup(LSTM * this){
-    if(this == NULL){
-        return;
+    // Apply activations to gates
+    for (int i = 0; i < hidden_size; i++) {
+        float input_gate = sigmoid(gates[i]);
+        float forget_gate = sigmoid(gates[hidden_size + i]);
+        float cell_gate = tanh_approx(gates[2 * hidden_size + i]);
+        float output_gate = sigmoid(gates[3 * hidden_size + i]);
+
+        // Update cell state
+        new_cell[i] = forget_gate * prev_cell[i] + input_gate * cell_gate;
+
+        // Compute hidden state
+        output_hidden[i] = output_gate * tanh_approx(new_cell[i]);
     }
 
-    tensor_cleanup(this->Wf);
-    tensor_cleanup(this->Wi);
-    tensor_cleanup(this->Wo);
-    tensor_cleanup(this->Wy);
-
-    tensor_array_cleanup(this->hidden_states, this->sequence_length);
-    tensor_array_cleanup(this->cell_states, this->sequence_length);
-    tensor_array_cleanup(this->concat_inputs, this->sequence_length);
-    tensor_array_cleanup(this->forget_gates, this->sequence_length);
-    tensor_array_cleanup(this->input_gates, this->sequence_length);
-    tensor_array_cleanup(this->candidate_gates, this->sequence_length);
-    tensor_array_cleanup(this->output_gates, this->sequence_length);
-    tensor_array_cleanup(this->outputs, this->sequence_length);
-
-
-
-
-    // free(this->hidden_states);
-    // free(this->cell_states);
-
-    // free(this);
-    SAFE_FREE(this->hidden_states);
-    SAFE_FREE(this->cell_states);
-    SAFE_FREE(this);
+    // Manually copy updated cell state to output_cell
+    array_copy(output_cell, new_cell, hidden_size);
 }
+
+// Vocabulary-to-index mapping
+int get_vocab_index(char c) {
+    if (c >= 'a' && c <= 'z') return c - 'a';
+    if (c >= 'A' && c <= 'Z') return c - 'A';
+    return 26; // Unknown token
+}
+
+int main() {
+    // LSTM parameters
+    const int input_size = 27;  // 26 letters + 1 unknown
+    const int hidden_size = 50;  // Embedding size
+
+    // Text input
+    const char *text = "hello, my name is Patrick Li. I am a student from Umich.";
+    int text_length = strlen(text);
+
+    // Allocate memory
+    float *memory = (float *)mem_alloc((8 * hidden_size + hidden_size) * sizeof(float));
+    if (!memory) {
+        // perror("Failed to allocate memory");
+        
+        return -1;
+    }
+
+    // Assign parts of memory
+    float *prev_hidden = memory;                       // Hidden state at t-1
+    float *prev_cell = prev_hidden + hidden_size;      // Cell state at t-1
+    float *workspace = prev_cell + hidden_size;        // Workspace for gates and new cell state
+
+    // Initialize weights, biases, and states
+    float weights[4 * hidden_size * (input_size + hidden_size)];
+    float biases[4 * hidden_size];
+    float input[input_size];
+    float output_hidden[hidden_size];
+    float output_cell[hidden_size];
+
+    // Fill weights and biases with dummy values
+    for (int i = 0; i < 4 * hidden_size * (input_size + hidden_size); i++) {
+        weights[i] = 0.1f; // Example value
+    }
+    for (int i = 0; i < 4 * hidden_size; i++) {
+        biases[i] = 0.1f; // Example value
+    }
+
+    // Initialize previous hidden and cell states
+    for (int i = 0; i < hidden_size; i++) {
+        prev_hidden[i] = 0.0f;
+        prev_cell[i] = 0.0f;
+    }
+
+    // Process each character in the text
+    for (int t = 0; t < text_length; t++) {
+        // Reset input vector
+        for (int i = 0; i < input_size; i++) input[i] = 0.0f;
+
+        // One-hot encode the current character
+        int char_index = get_vocab_index(text[t]);
+        if (char_index < input_size) input[char_index] = 1.0f;
+
+        // Perform forward pass
+        lstm_forward(input, prev_hidden, prev_cell, weights, biases, input_size, hidden_size, prev_hidden, prev_cell, workspace);
+    }
+
+    // Use the final hidden state as the embedding
+    printf("Text embedding:\n");
+    for (int i = 0; i < hidden_size; i++) {
+        printf("%.4f ", prev_hidden[i]);
+    }
+    printf("\n");
+
+    // Free allocated memory
+    // free(memory);
+
+    return 0;
+}
+
