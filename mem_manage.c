@@ -25,7 +25,7 @@ float * wram(Tensor_ptr tensor) {
 }
 
 Tensor_ptr disengage_tensor(Tensor_ptr tensor) {
-    mram_write((__mram_ptr void const *) tensor.mram_ptr, tensor.wram_ptr, tensor.size * sizeof(float));
+    mram_write(tensor.wram_ptr, (__mram_ptr void const *) tensor.mram_ptr, tensor.size * sizeof(float));
     return tensor;
 }
 
