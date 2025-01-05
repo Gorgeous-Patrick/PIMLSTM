@@ -14,9 +14,10 @@ Tensor_ptr tensor_init(size_t size) {
 
     // Increment the static MRAM pointer
     current_mram_addr += size;
+    printf("Allocated tensor at MRAM address %p with size %lu bytes.\n", tensor.mram_addr, size);
 
     // Check for MRAM overflow
-    if ((uint32_t)current_mram_addr >= (uint32_t)DPU_MRAM_HEAP_POINTER + 64 * 1024) { // Assuming 64 KB MRAM per DPU
+    if ((uint32_t)current_mram_addr >= (uint32_t)DPU_MRAM_HEAP_POINTER + 16 * 1024 * 1024) { // Assuming 64 KB MRAM per DPU
         printf("Error: Not enough MRAM space for tensor allocation.\n");
         tensor.mram_addr = NULL; // Mark as invalid
         tensor.size = 0;

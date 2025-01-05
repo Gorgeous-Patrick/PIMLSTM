@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <alloc.h>
 #include <string.h>
+#include <assert.h>
 #include "mem_manage.h"
 
 // Approximation of exp(x)
@@ -30,7 +31,7 @@ void array_copy(float *dest, const float *src, int size) {
 
 // LSTM forward pass with MRAM-accelerated memory management
 void lstm_forward(float *input, Tensor_ptr prev_hidden, Tensor_ptr prev_cell, 
-                  Tensor_ptr weights, Tensor_ptr biases, int input_size, int hidden_size,
+                  Tensor_ptr weights, Tensor_ptr biases, int input_size, const int hidden_size,
                   Tensor_ptr output_hidden, Tensor_ptr output_cell, float *wram_buffer) {
     // Workspace memory allocation in WRAM
     float *gates = wram_buffer; // Store [input gate, forget gate, cell gate, output gate] concatenated
@@ -66,6 +67,7 @@ void lstm_forward(float *input, Tensor_ptr prev_hidden, Tensor_ptr prev_cell,
         }
     }
 
+        printf("i = %d hidden = %d\n &hidden=%p", -1, hidden_size, &hidden_size);
     // Apply activations to gates
     for (int i = 0; i < hidden_size; i++) {
         float input_gate = sigmoid(gates[i]);
@@ -74,10 +76,13 @@ void lstm_forward(float *input, Tensor_ptr prev_hidden, Tensor_ptr prev_cell,
         float output_gate = sigmoid(gates[3 * hidden_size + i]);
 
         // Update cell state
+        // printf("new_cell[%d]: %p\n", i, new_cell + i);
+        printf("i = %d hidden = %d\n &hidden=%p", i, hidden_size, &hidden_size);
+        printf("new cell at %p / upper bound: %p\n", new_cell + i, wram_buffer + 9 * hidden_size);
         new_cell[i] = forget_gate * new_cell[i] + input_gate * cell_gate;
 
-        // Compute hidden state
-        gates[4 * hidden_size + i] = output_gate * tanh_approx(new_cell[i]);
+        // // Compute hidden state
+        // gates[4 * hidden_size + i] = output_gate * tanh_approx(new_cell[i]);
     }
 
     // Store updated states back to MRAM
@@ -94,15 +99,17 @@ int get_vocab_index(char c) {
 
 int main() {
     // LSTM parameters
+    mem_reset();
     const int input_size = 27;  // 26 letters + 1 unknown
-    const int hidden_size = 1000;  // Embedding size
-
+    const int hidden_size = 100;  // Embedding size
+    printf("Hello, world!\n");
     // Text input
-    const char *text = "hello, my name is Patrick Li. I am a student from Umich.";
+    const char *text = "h";
     int text_length = strlen(text);
 
     // WRAM buffer
     float *wram_buffer = (float *)mem_alloc((8 * hidden_size + hidden_size) * sizeof(float));
+    printf("wram_buffer: %p\n", wram_buffer + 9 * hidden_size);
     if (!wram_buffer) {
         // perror("Failed to allocate WRAM buffer");
         return -1;
@@ -116,24 +123,24 @@ int main() {
     Tensor_ptr output_hidden = tensor_init(hidden_size);
     Tensor_ptr output_cell = tensor_init(hidden_size);
 
-    // Fill weights and biases with dummy values (in MRAM)
-    float temp_wb[4 * hidden_size * (input_size + hidden_size)];
-    for (int i = 0; i < 4 * hidden_size * (input_size + hidden_size); i++) {
-        temp_wb[i] = 0.1f; // Example value
-    }
-    tensor_store(weights, temp_wb, 4 * hidden_size * (input_size + hidden_size));
+    // // Fill weights and biases with dummy values (in MRAM)
+    // float temp_wb[4 * hidden_size * (input_size + hidden_size)];
+    // for (int i = 0; i < 4 * hidden_size * (input_size + hidden_size); i++) {
+    //     temp_wb[i] = 0.1f; // Example value
+    // }
+    // tensor_store(weights, temp_wb, 4 * hidden_size * (input_size + hidden_size));
 
-    for (int i = 0; i < 4 * hidden_size; i++) {
-        temp_wb[i] = 0.1f; // Example value
-    }
-    tensor_store(biases, temp_wb, 4 * hidden_size);
+    // for (int i = 0; i < 4 * hidden_size; i++) {
+    //     temp_wb[i] = 0.1f; // Example value
+    // }
+    // tensor_store(biases, temp_wb, 4 * hidden_size);
 
-    // Initialize previous hidden and cell states (in MRAM)
-    for (int i = 0; i < hidden_size; i++) {
-        temp_wb[i] = 0.0f;
-    }
-    tensor_store(prev_hidden, temp_wb, hidden_size);
-    tensor_store(prev_cell, temp_wb, hidden_size);
+    // // Initialize previous hidden and cell states (in MRAM)
+    // for (int i = 0; i < hidden_size; i++) {
+    //     temp_wb[i] = 0.0f;
+    // }
+    // tensor_store(prev_hidden, temp_wb, hidden_size);
+    // tensor_store(prev_cell, temp_wb, hidden_size);
 
     // Process each character in the text
     for (int t = 0; t < text_length; t++) {
