@@ -6,7 +6,7 @@
 
 // Tensor pointer structure
 typedef struct {
-    uint32_t *mram_addr; // Pointer to the tensor in MRAM
+    uint32_t mram_addr; // Pointer to the tensor in MRAM
     size_t size;                 // Size of the tensor in elements (not bytes)
 } Tensor_ptr;
 

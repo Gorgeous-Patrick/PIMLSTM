@@ -7,7 +7,8 @@
 
 // Approximation of exp(x)
 float exp_approx(float x) {
-    float result = 1.0f + x + (x * x) / 2.0f + (x * x * x) / 6.0f;
+    double x_ = x;
+    double result = 1.0f + x_ + (x_ * x_) / 2.0f + (x_ * x_ * x_) / 6.0f;
     return result > 100.0f ? 100.0f : result; // Prevent overflow
 }
 
@@ -38,9 +39,10 @@ void lstm_forward(float *input, Tensor_ptr prev_hidden, Tensor_ptr prev_cell,
     float *new_cell = gates + 4 * hidden_size;
 
     // Load weights and biases in chunks dynamically
-    const int chunk_size = 512; // Size of WRAM chunks to process
+    const int chunk_size = 32; // Size of WRAM chunks to process
     float chunk_buffer[chunk_size];
 
+        // printf("hidden = %d &hidden=%p gates=%p new_cell=%p chunk=%p\n", hidden_size, &hidden_size, gates, new_cell, chunk_buffer);
     // Process weights and biases dynamically without large WRAM allocations
     for (int i = 0; i < 4 * hidden_size; i++) {
         gates[i] = 0.0f; // Initialize gate with bias
@@ -57,7 +59,9 @@ void lstm_forward(float *input, Tensor_ptr prev_hidden, Tensor_ptr prev_cell,
         }
 
         for (int j = 0; j < hidden_size; j += chunk_size) {
-            int load_size = (j + chunk_size > hidden_size) ? (hidden_size - j) : chunk_size;
+            // int load_size = (j + chunk_size > hidden_size) ? (hidden_size - j) : chunk_size;
+            int load_size = 0;
+            // printf("Size = %zu\n", load_size);
             tensor_load(weights, chunk_buffer, load_size);
 
             // Compute gate contributions
@@ -67,18 +71,19 @@ void lstm_forward(float *input, Tensor_ptr prev_hidden, Tensor_ptr prev_cell,
         }
     }
 
-        printf("i = %d hidden = %d\n &hidden=%p", -1, hidden_size, &hidden_size);
+        // printf("hidden = %d &hidden=%p\n", hidden_size, &hidden_size);
     // Apply activations to gates
     for (int i = 0; i < hidden_size; i++) {
-        float input_gate = sigmoid(gates[i]);
+        float tmp = gates[i];
+        float input_gate = sigmoid(tmp);
         float forget_gate = sigmoid(gates[hidden_size + i]);
         float cell_gate = tanh_approx(gates[2 * hidden_size + i]);
         float output_gate = sigmoid(gates[3 * hidden_size + i]);
 
         // Update cell state
         // printf("new_cell[%d]: %p\n", i, new_cell + i);
-        printf("i = %d hidden = %d\n &hidden=%p", i, hidden_size, &hidden_size);
-        printf("new cell at %p / upper bound: %p\n", new_cell + i, wram_buffer + 9 * hidden_size);
+        // printf("i = %d hidden = %d\n &hidden=%p", i, hidden_size, &hidden_size);
+        // printf("new cell at %p / upper bound: %p\n", new_cell + i, wram_buffer + 9 * hidden_size);
         new_cell[i] = forget_gate * new_cell[i] + input_gate * cell_gate;
 
         // // Compute hidden state
@@ -101,15 +106,15 @@ int main() {
     // LSTM parameters
     mem_reset();
     const int input_size = 27;  // 26 letters + 1 unknown
-    const int hidden_size = 100;  // Embedding size
-    printf("Hello, world!\n");
+    const int hidden_size = 10;  // Embedding size
+    // printf("Hello, world!\n");
     // Text input
     const char *text = "h";
     int text_length = strlen(text);
 
     // WRAM buffer
     float *wram_buffer = (float *)mem_alloc((8 * hidden_size + hidden_size) * sizeof(float));
-    printf("wram_buffer: %p\n", wram_buffer + 9 * hidden_size);
+    // printf("wram_buffer: %p\n", wram_buffer + 9 * hidden_size);
     if (!wram_buffer) {
         // perror("Failed to allocate WRAM buffer");
         return -1;
@@ -160,11 +165,11 @@ int main() {
     float final_hidden[hidden_size];
     tensor_load(output_hidden, final_hidden, hidden_size);
 
-    printf("Text embedding:\n");
+    // printf("Text embedding:\n");
     for (int i = 0; i < hidden_size; i++) {
-        printf("%.4f ", final_hidden[i]);
+        // printf("%.4f ", final_hidden[i]);
     }
-    printf("\n");
+    // printf("\n");
 
     // Free WRAM buffer
     // free(wram_buffer);
