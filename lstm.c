@@ -5,7 +5,10 @@
 #include <assert.h>
 #include "mem_manage.h"
 #define CHUNK_SIZE 32
-float chunk_buffer[32];
+#define HIDDEN_SIZE 10
+__dma_aligned float chunk_buffer[32];
+
+__dma_aligned float wram_buffer[8 * HIDDEN_SIZE + HIDDEN_SIZE];
 
 // Approximation of exp(x)
 float exp_approx(float x) {
@@ -88,7 +91,7 @@ void lstm_forward(float *input, Tensor_ptr prev_hidden, Tensor_ptr prev_cell,
         new_cell[i] = forget_gate * new_cell[i] + input_gate * cell_gate;
 
         // // Compute hidden state
-        // gates[4 * hidden_size + i] = output_gate * tanh_approx(new_cell[i]);
+        gates[4 * hidden_size + i] = output_gate * tanh_approx(new_cell[i]);
     }
 
     // Store updated states back to MRAM
@@ -107,14 +110,14 @@ int main() {
     // LSTM parameters
     mem_reset();
     const int input_size = 27;  // 26 letters + 1 unknown
-    const int hidden_size = 10;  // Embedding size
+    const int hidden_size = HIDDEN_SIZE;  // Embedding size
     // printf("Hello, world!\n");
     // Text input
     const char *text = "h";
     int text_length = strlen(text);
 
     // WRAM buffer
-    float *wram_buffer = (float *)mem_alloc((8 * hidden_size + hidden_size) * sizeof(float));
+    // float *wram_buffer = (float *)mem_alloc((8 * hidden_size + hidden_size) * sizeof(float));
     // printf("wram_buffer: %p\n", wram_buffer + 9 * hidden_size);
     if (!wram_buffer) {
         // perror("Failed to allocate WRAM buffer");
