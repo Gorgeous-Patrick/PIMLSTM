@@ -3,6 +3,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#define CHUNK_SIZE 20
 
 // Tensor pointer structure
 typedef struct {
@@ -17,7 +18,7 @@ Tensor_ptr tensor_init(size_t size);
 void tensor_load(Tensor_ptr tensor, float *wram_buffer, size_t size);
 
 // Store data from WRAM to MRAM
-void tensor_store(Tensor_ptr tensor, const float *wram_buffer, size_t size);
+__attribute__((noinline)) void tensor_store(Tensor_ptr tensor, const float *wram_buffer, size_t size);
 
 
 

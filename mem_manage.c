@@ -5,6 +5,7 @@
 
 // Static pointer to keep track of the current allocation position in MRAM
 static uint32_t current_mram_addr = (uint32_t) DPU_MRAM_HEAP_POINTER;
+static float chunk[CHUNK_SIZE];
 
 // Initialize a tensor in MRAM
 Tensor_ptr tensor_init(size_t size) {
@@ -13,7 +14,7 @@ Tensor_ptr tensor_init(size_t size) {
     tensor.size = size;
 
     // Increment the static MRAM pointer
-    current_mram_addr += size;
+    current_mram_addr += size * sizeof(float);
     // printf("Allocated tensor at MRAM address %p with size %zu bytes.\n", tensor.mram_addr, size);
 
     // Check for MRAM overflow
@@ -39,7 +40,7 @@ void tensor_load(Tensor_ptr tensor, float *wram_buffer, size_t size) {
 }
 
 // Store data from WRAM to MRAM
-void tensor_store(Tensor_ptr tensor, const float *wram_buffer, size_t size) {
+__attribute__((noinline)) void tensor_store(Tensor_ptr tensor, const float *wram_buffer, size_t size) {
     if (size > tensor.size) {
         // printf("Error: Data size exceeds tensor size in MRAM.\n");
         return;
