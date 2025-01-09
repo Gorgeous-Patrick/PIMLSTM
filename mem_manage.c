@@ -5,7 +5,6 @@
 
 // Static pointer to keep track of the current allocation position in MRAM
 static uint32_t current_mram_addr = (uint32_t) DPU_MRAM_HEAP_POINTER;
-static float chunk[CHUNK_SIZE];
 
 // Initialize a tensor in MRAM
 Tensor_ptr tensor_init(size_t size) {

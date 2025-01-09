@@ -3,7 +3,6 @@
 
 #include <stddef.h>
 #include <stdint.h>
-#define CHUNK_SIZE 20
 
 // Tensor pointer structure
 typedef struct {

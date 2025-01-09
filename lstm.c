@@ -4,6 +4,8 @@
 #include <string.h>
 #include <assert.h>
 #include "mem_manage.h"
+#define CHUNK_SIZE 32
+float chunk_buffer[32];
 
 // Approximation of exp(x)
 float exp_approx(float x) {
@@ -39,8 +41,7 @@ void lstm_forward(float *input, Tensor_ptr prev_hidden, Tensor_ptr prev_cell,
     float *new_cell = gates + 4 * hidden_size;
 
     // Load weights and biases in chunks dynamically
-    const int chunk_size = 32; // Size of WRAM chunks to process
-    float chunk_buffer[chunk_size];
+    const int chunk_size = CHUNK_SIZE; // Size of WRAM chunks to process
 
         // printf("hidden = %d &hidden=%p gates=%p new_cell=%p chunk=%p\n", hidden_size, &hidden_size, gates, new_cell, chunk_buffer);
     // Process weights and biases dynamically without large WRAM allocations
