@@ -1,5 +1,5 @@
 dev: lstm.c mem_manage.c
-	dpu-upmem-dpurte-clang -O2 lstm.c mem_manage.c -o dev
+	dpu-upmem-dpurte-clang -O2 lstm.c -o dev
 host:
 	gcc --std=c99 host.c -o host `dpu-pkg-config --cflags --libs dpu`
 

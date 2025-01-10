@@ -2,6 +2,8 @@
 #define TENSOR_H
 #include <stdint.h>
 #define CHUNK_SIZE 32
+
+__dma_aligned double chunk[CHUNK_SIZE];
 typedef struct _Tensor {
     uint64_t width, height;
     uint32_t mram;
