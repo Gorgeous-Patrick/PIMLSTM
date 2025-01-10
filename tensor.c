@@ -54,3 +54,19 @@ void vec_add(Vec v, double * in, double *out) {
         out[i] += in[i];
     }
 }
+
+
+
+void v_mul(Vec v, double * in, double * out) {
+    mram_read(v.mram, chunk, v.length);
+    for (int i = 0; i < v.length; i++) {
+        out[i] += in[i] * chunk[i];
+    }
+}
+
+void vs_mul(Vec v, double s, double *out) {
+    mram_read(v.mram, chunk, v.length);
+    for (int i = 0; i < v.length; i++) {
+        out[i]= s * chunk[i];
+    }
+}

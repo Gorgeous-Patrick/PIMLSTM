@@ -24,5 +24,6 @@ typedef struct _Vec {
 Vec create_vec(__mram_ptr double *, uint64_t);
 Vec create_vec_init(__mram_ptr double *, double *, uint64_t);
 void vec_add(Vec, double * in, double *out);
-
+void v_mul(Vec, double* in, double* out);
+void vs_mul(Vec, double, double* out);
 #endif
